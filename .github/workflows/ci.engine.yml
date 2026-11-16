@@ -151,7 +151,7 @@ jobs:
         run: ctest --test-dir "$BUILD_DIR" --output-on-failure
 
       - name: Write the coverage report
-        run: gcovr --root . --filter src/ --exclude 'src/(.*/)?tests/' --sonarqube build/coverage.xml "$BUILD_DIR"
+        run: gcovr --root . --filter 'src/(libs|api)/' --exclude 'src/(.*/)?tests/' --sonarqube build/coverage.xml "$BUILD_DIR"
 
       - name: Upload the analysis inputs
         uses: actions/upload-artifact@v7
