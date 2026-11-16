@@ -30,7 +30,7 @@ api   ->  core, sim, save
 
 ## Workflow
 
-- Build and test in one command: `cmake --workflow --preset <os>-<compiler>-<debug|release>`, e.g. `windows-msvc-debug` or `linux-gcc-debug`. CI builds and tests Debug on every compiler (MSVC, GCC, Clang) plus one Release build per OS (MSVC, GCC).
+- Build and test in one command: `cmake --workflow --preset <os>-<compiler>-<debug|release>`, e.g. `windows-msvc-debug` or `linux-gcc-debug`. CI builds and tests Release on Linux only (GCC and Clang), since the server target is Linux. Windows presets are for local work.
 - Add a new platform or compiler as a hidden preset in `CMakePresets.json` that inherits `windows` or `linux`, then add debug/release presets on top.
 - Add tests with `limsim_add_test(<name> SOURCES ... LIBS ...)` (doctest).
 - Keep changes small and focused; one concern per PR.
@@ -48,6 +48,13 @@ api   ->  core, sim, save
 | `filesystem` | Read, write and search files of the worktree. | Node |
 
 When a server is not connected, say so, then continue with the shell.
+
+## Linting
+
+- Formatting follows `.clang-format`; CLion applies it on Reformat Code. CI fails on any unformatted file.
+- `.clang-tidy` enables bugprone, cert, core guidelines, modernize, performance and readability checks as errors. Names are `lower_case` (members of classes end in `_`), template parameters `CamelCase`, macros `UPPER_CASE`.
+- Each `tests/` folder has a `.clang-tidy` that relaxes the checks doctest's macros trip.
+- Run locally: `clang-format -i <files>` and `run-clang-tidy -p build/<preset>`.
 
 ## Quality gate
 

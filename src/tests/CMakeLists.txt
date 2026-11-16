@@ -1,4 +1,4 @@
-limsim_add_test(limsim_api_tests
+limsim_add_test(tests_api
   SOURCES api_smoke_test.cpp
-  LIBS limsim_api
+  LIBS api
 )
