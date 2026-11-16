@@ -76,6 +76,7 @@ jobs:
       matrix:
         include:
           - { label: Linux Clang, os: ubuntu-24.04, preset: linux-clang-release }
+          - { label: Linux GCC, os: ubuntu-24.04, preset: linux-gcc-coverage }
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -90,6 +91,7 @@ jobs:
         run: cmake --build --preset ${{ matrix.preset }}
 
       - name: Upload the build
+        if: matrix.preset == 'linux-gcc-coverage'
         uses: actions/upload-artifact@v7
         with:
           name: build-${{ matrix.preset }}
@@ -122,34 +124,48 @@ jobs:
           fi
 
   runner:
-    name: test-runner (${{ matrix.label }})
+    name: test-runner
     needs: [changes, compile]
     if: needs.changes.outputs.relevant == 'true'
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { label: Linux Clang, os: ubuntu-24.04, preset: linux-clang-release }
+    env:
+      BUILD_DIR: build/linux-gcc-coverage
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Install gcovr
+        run: sudo apt-get update && sudo apt-get install -y gcovr
+
       - name: Download the build
         uses: actions/download-artifact@v8
         with:
-          name: build-${{ matrix.preset }}
-          path: build/${{ matrix.preset }}
+          name: build-linux-gcc-coverage
+          path: ${{ env.BUILD_DIR }}
 
       - name: Restore executable permissions
-        run: find build/${{ matrix.preset }} -type f -name 'tests_*' -exec chmod +x {} +
+        run: find "$BUILD_DIR" -type f -name 'tests_*' -exec chmod +x {} +
 
       - name: Run the tests
-        run: ctest --test-dir build/${{ matrix.preset }} --output-on-failure
+        run: ctest --test-dir "$BUILD_DIR" --output-on-failure
+
+      - name: Write the coverage report
+        run: gcovr --root . --filter src/ --exclude 'src/(.*/)?tests/' --sonarqube build/coverage.xml "$BUILD_DIR"
+
+      - name: Upload the analysis inputs
+        uses: actions/upload-artifact@v7
+        with:
+          name: sonar-inputs
+          path: |
+            build/coverage.xml
+            ${{ env.BUILD_DIR }}/compile_commands.json
+            ${{ env.BUILD_DIR }}/_deps/doctest-src/doctest
+          if-no-files-found: error
+          retention-days: 1
 
   test:
-    needs: [changes, runner, coverage]
+    needs: [changes, runner]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 2
@@ -166,52 +182,15 @@ jobs:
       - name: Check the tests
         if: needs.changes.outputs.relevant == 'true'
         env:
-          RUNNER: ${{ needs.runner.result }}
-          COVERAGE: ${{ needs.coverage.result }}
+          RESULT: ${{ needs.runner.result }}
         run: |
-          if [ "$RUNNER" != success ]; then
-            echo "::error::The Clang tests finished with result $RUNNER."
+          if [ "$RESULT" != success ]; then
+            echo "::error::The tests finished with result $RESULT."
             exit 1
           fi
-          if [ "$COVERAGE" != success ]; then
-            echo "::error::The GCC coverage tests finished with result $COVERAGE."
-            exit 1
-          fi
-
-  coverage:
-    name: coverage (Linux GCC)
-    needs: changes
-    if: needs.changes.outputs.relevant == 'true'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Install Ninja and gcovr
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ninja-build gcovr
-
-      - name: Build and test with coverage
-        run: cmake --workflow --preset linux-gcc-coverage
-
-      - name: Write the coverage report
-        run: gcovr --root . --filter src/ --exclude 'src/(.*/)?tests/' --sonarqube build/coverage.xml build/linux-gcc-coverage
-
-      - name: Upload the analysis inputs
-        uses: actions/upload-artifact@v7
-        with:
-          name: sonar-inputs
-          path: |
-            build/coverage.xml
-            build/linux-gcc-coverage/compile_commands.json
-            build/linux-gcc-coverage/_deps/doctest-src/doctest
-          if-no-files-found: error
-          retention-days: 1
 
   sonarqube:
-    needs: [changes, test, coverage]
+    needs: [changes, test]
     if: ${{ !cancelled() && needs.test.result == 'success' && needs.changes.outputs.relevant == 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -223,15 +202,6 @@ jobs:
         run: |
           echo "::error::SonarQube Cloud needs repository secrets, which fork pull requests cannot read. Push the branch to this repository and open the pull request from it."
           exit 1
-
-      - name: Check the coverage job
-        env:
-          RESULT: ${{ needs.coverage.result }}
-        run: |
-          if [ "$RESULT" != success ]; then
-            echo "::error::The coverage job finished with result $RESULT."
-            exit 1
-          fi
 
       - name: Checkout
         uses: actions/checkout@v7
