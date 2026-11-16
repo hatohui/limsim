@@ -30,7 +30,34 @@ api   ->  core, sim, save
 
 ## Workflow
 
-- Build: `cmake --preset debug && cmake --build --preset debug`.
+- Build and test in one command: `cmake --workflow --preset <os>-<compiler>-<debug|release>`, e.g. `windows-msvc-debug` or `linux-gcc-debug`. CI builds and tests Debug on every compiler (MSVC, GCC, Clang) plus one Release build per OS (MSVC, GCC).
+- Add a new platform or compiler as a hidden preset in `CMakePresets.json` that inherits `windows` or `linux`, then add debug/release presets on top.
+- Add tests with `limsim_add_test(<name> SOURCES ... LIBS ...)` (doctest).
 - Keep changes small and focused; one concern per PR.
 - Record notable design choices as a short ADR in `docs/decisions/`.
 - Update `docs/` when you change architecture or a library boundary.
+
+## MCP servers
+
+`.mcp.json` configures them. Credentials come from your environment, never from the repo. Use them whenever the task calls for them, before falling back to the shell:
+
+| Server | Use it to | Needs |
+|---|---|---|
+| `sonarqube` | Read the quality gate and issues of a branch or pull request, and fix what it reports. | Docker, `SONARQUBE_TOKEN` |
+| `context7` | Read current documentation of C++, CMake and libraries before relying on an API. | Node; `CONTEXT7_API_KEY` optional |
+| `filesystem` | Read, write and search files of the worktree. | Node |
+
+When a server is not connected, say so, then continue with the shell.
+
+## Quality gate
+
+CI analyzes every pull request and `main` with SonarQube Cloud, using coverage from the `linux-gcc-coverage` preset. Run it locally with `cmake --workflow --preset linux-gcc-coverage`.
+
+## Hard rules
+
+- **Read first.** Read the current state of the files before changing anything; they may have changed since you last saw them.
+- **Keep docs current.** When a change makes a document outdated, update the document in the same change.
+- **No guessing.** Ask the owner when a requirement is unknown.
+- **No silent changes.** State any design choice the owner did not give, in your reply or PR.
+- **No leftovers.** Replace old code instead of commenting it out. Git history explains changes.
+- **Comment sparingly.** Comment at the start of a block, function or class only when the code doesn't make it obvious.
