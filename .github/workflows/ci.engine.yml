@@ -1,0 +1,224 @@
+name: ci-engine
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-engine-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  changes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      relevant: ${{ steps.filter.outputs.relevant == 'true' || github.event_name == 'workflow_dispatch' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Detect relevant changes
+        id: filter
+        uses: dorny/paths-filter@v4
+        with:
+          filters: |
+            relevant:
+              - "src/**"
+              - "cmake/**"
+              - "content/**"
+              - "CMakeLists.txt"
+              - "CMakePresets.json"
+              - ".clang-format"
+              - ".clang-tidy"
+              - ".github/workflows/ci.engine.yml"
+
+  lint:
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install Ninja and the LLVM tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build clang-format clang-tidy
+
+      - name: Check formatting
+        run: git ls-files 'src/*.h' 'src/*.hpp' 'src/*.cpp' | xargs --no-run-if-empty clang-format --dry-run --Werror
+
+      - name: Configure
+        run: cmake --preset linux-clang-release
+
+      - name: Run clang-tidy
+        run: git ls-files 'src/*.cpp' | xargs --no-run-if-empty run-clang-tidy -quiet -p build/linux-clang-release
+
+  compile:
+    name: compile (${{ matrix.label }})
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { label: Linux Clang, os: ubuntu-24.04, preset: linux-clang-release }
+          - { label: Linux GCC, os: ubuntu-24.04, preset: linux-gcc-coverage }
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install Ninja
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+
+      - name: Configure
+        run: cmake --preset ${{ matrix.preset }}
+
+      - name: Build
+        run: cmake --build --preset ${{ matrix.preset }}
+
+      - name: Upload the build
+        if: matrix.preset == 'linux-gcc-coverage'
+        uses: actions/upload-artifact@v7
+        with:
+          name: build-${{ matrix.preset }}
+          path: build/${{ matrix.preset }}
+          retention-days: 1
+
+  build:
+    needs: [changes, compile]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Check the change detection
+        env:
+          RESULT: ${{ needs.changes.result }}
+        run: |
+          if [ "$RESULT" != success ]; then
+            echo "::error::The change detection finished with result $RESULT."
+            exit 1
+          fi
+
+      - name: Check the platform builds
+        if: needs.changes.outputs.relevant == 'true'
+        env:
+          RESULT: ${{ needs.compile.result }}
+        run: |
+          if [ "$RESULT" != success ]; then
+            echo "::error::The platform builds finished with result $RESULT."
+            exit 1
+          fi
+
+  runner:
+    name: test-runner
+    needs: [changes, compile]
+    if: needs.changes.outputs.relevant == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      BUILD_DIR: build/linux-gcc-coverage
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install gcovr
+        run: sudo apt-get update && sudo apt-get install -y gcovr
+
+      - name: Download the build
+        uses: actions/download-artifact@v8
+        with:
+          name: build-linux-gcc-coverage
+          path: ${{ env.BUILD_DIR }}
+
+      - name: Restore executable permissions
+        run: find "$BUILD_DIR" -type f -name 'tests_*' -exec chmod +x {} +
+
+      - name: Run the tests
+        run: ctest --test-dir "$BUILD_DIR" --output-on-failure
+
+      - name: Write the coverage report
+        run: gcovr --root . --filter src/ --exclude 'src/(.*/)?tests/' --sonarqube build/coverage.xml "$BUILD_DIR"
+
+      - name: Upload the analysis inputs
+        uses: actions/upload-artifact@v7
+        with:
+          name: sonar-inputs
+          path: |
+            build/coverage.xml
+            ${{ env.BUILD_DIR }}/compile_commands.json
+            ${{ env.BUILD_DIR }}/_deps/doctest-src/doctest
+          if-no-files-found: error
+          retention-days: 1
+
+  test:
+    needs: [changes, runner]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Check the change detection
+        env:
+          RESULT: ${{ needs.changes.result }}
+        run: |
+          if [ "$RESULT" != success ]; then
+            echo "::error::The change detection finished with result $RESULT."
+            exit 1
+          fi
+
+      - name: Check the tests
+        if: needs.changes.outputs.relevant == 'true'
+        env:
+          RESULT: ${{ needs.runner.result }}
+        run: |
+          if [ "$RESULT" != success ]; then
+            echo "::error::The tests finished with result $RESULT."
+            exit 1
+          fi
+
+  sonarqube:
+    needs: [changes, test]
+    if: ${{ !cancelled() && needs.test.result == 'success' && needs.changes.outputs.relevant == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    steps:
+      - name: Reject fork pull request
+        if: github.event.pull_request.head.repo.fork == true
+        run: |
+          echo "::error::SonarQube Cloud needs repository secrets, which fork pull requests cannot read. Push the branch to this repository and open the pull request from it."
+          exit 1
+
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Download the analysis inputs
+        uses: actions/download-artifact@v8
+        with:
+          name: sonar-inputs
+          path: build
+
+      - name: SonarQube Cloud scan
+        uses: SonarSource/sonarqube-scan-action@v8.3.0
+        env:
+          SONAR_HOST_URL: https://sonarcloud.io
+        with:
+          args: >
+            -Dsonar.qualitygate.wait=true
+            -Dsonar.qualitygate.timeout=300

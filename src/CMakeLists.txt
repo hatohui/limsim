@@ -8,3 +8,7 @@ endif()
 
 add_subdirectory(api)
 add_subdirectory(apps/cli)
+
+if(LIMSIM_BUILD_TESTS)
+  add_subdirectory(tests)
+endif()

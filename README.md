@@ -25,11 +25,19 @@ external/       Third-party deps (gitignored)
 ## Build
 
 ```
-cmake --preset debug
-cmake --build --preset debug
+cmake --workflow --preset <preset>
 ```
 
-In CLion, the Debug and Release presets from `CMakePresets.json` show up as CMake profiles. Pick one and use Build, or Run with the `limsim_cli` target.
+This configures, builds and runs the tests. Presets are split per platform and compiler, and only the ones for your OS show up:
+
+| Platform | Presets |
+|---|---|
+| Windows | `windows-msvc-debug`, `windows-msvc-release`, `windows-mingw-debug`, `windows-mingw-release` |
+| Linux | `linux-gcc-debug`, `linux-gcc-release`, `linux-clang-debug`, `linux-clang-release` |
+
+MSVC presets need a Developer Command Prompt (or CLion's Visual Studio toolchain).
+
+In CLion, the presets for your OS show up as CMake profiles; pick the one that matches your toolchain, then use Build, or Run with the `limsim_cli` target.
 
 Pass `-DLIMSIM_BUILD_NET=ON` to build the co-op library.
 
