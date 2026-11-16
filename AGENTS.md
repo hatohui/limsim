@@ -30,7 +30,7 @@ api   ->  core, sim, save
 
 ## Workflow
 
-- Build and test in one command: `cmake --workflow --preset <os>-<compiler>-<debug|release>`, e.g. `windows-msvc-debug` or `linux-gcc-debug`. CI builds and tests Release on Linux only (GCC and Clang), since the server target is Linux. Windows presets are for local work.
+- Build and test in one command: `cmake --workflow --preset <os>-<compiler>-<debug|release>`, e.g. `windows-msvc-debug` or `linux-gcc-debug`. CI tests on Linux only, since the server target is Linux: Clang Release, plus GCC with coverage for SonarQube. Windows presets are for local work.
 - Add a new platform or compiler as a hidden preset in `CMakePresets.json` that inherits `windows` or `linux`, then add debug/release presets on top.
 - Add tests with `limsim_add_test(<name> SOURCES ... LIBS ...)` (doctest).
 - Keep changes small and focused; one concern per PR.

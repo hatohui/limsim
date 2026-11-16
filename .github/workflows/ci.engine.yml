@@ -75,7 +75,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { label: Linux GCC, os: ubuntu-24.04, preset: linux-gcc-release }
           - { label: Linux Clang, os: ubuntu-24.04, preset: linux-clang-release }
     steps:
       - name: Checkout
@@ -132,7 +131,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { label: Linux GCC, os: ubuntu-24.04, preset: linux-gcc-release }
           - { label: Linux Clang, os: ubuntu-24.04, preset: linux-clang-release }
     steps:
       - name: Checkout
@@ -151,7 +149,7 @@ jobs:
         run: ctest --test-dir build/${{ matrix.preset }} --output-on-failure
 
   test:
-    needs: [changes, runner]
+    needs: [changes, runner, coverage]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 2
@@ -168,14 +166,20 @@ jobs:
       - name: Check the tests
         if: needs.changes.outputs.relevant == 'true'
         env:
-          RESULT: ${{ needs.test-runner.result }}
+          RUNNER: ${{ needs.runner.result }}
+          COVERAGE: ${{ needs.coverage.result }}
         run: |
-          if [ "$RESULT" != success ]; then
-            echo "::error::The tests finished with result $RESULT."
+          if [ "$RUNNER" != success ]; then
+            echo "::error::The Clang tests finished with result $RUNNER."
+            exit 1
+          fi
+          if [ "$COVERAGE" != success ]; then
+            echo "::error::The GCC coverage tests finished with result $COVERAGE."
             exit 1
           fi
 
   coverage:
+    name: coverage (Linux GCC)
     needs: changes
     if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-24.04
