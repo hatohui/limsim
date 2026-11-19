@@ -18,21 +18,21 @@ api   ->  core, sim, save
 
 - `core` must never include anything from `sim`, `save` or `net`.
 - `sim` must never include `save` or `net`.
-- Engines only see `src/api/include/limsim/limsim.h`. No C++ types cross that boundary.
+- Engines only see `src/api/include/hatogin/hatogin.h`. No C++ types cross that boundary.
 
 ## Conventions
 
 - C++23, CMake 3.25+.
-- Public headers live in `src/libs/<lib>/include/limsim/<lib>/`; include them as `<limsim/<lib>/...>`.
+- Public headers live in `src/libs/<lib>/include/hatogin/<lib>/`; include them as `<hatogin/<lib>/...>`.
 - Private code lives in `src/libs/<lib>/src/`.
 - Unit tests sit next to each library in `tests/`; cross-library tests go in `src/tests/`.
 - Game data belongs in `content/data/`, not in code.
 
 ## Workflow
 
-- Build and test in one command: `cmake --workflow --preset <os>-<compiler>-<debug|release>`, e.g. `windows-msvc-debug` or `linux-gcc-debug`. CI runs on Linux only, since the server target is Linux. It compiles with Clang (Release) and GCC, and runs the tests once on the GCC build, which also produces coverage for SonarQube. Windows presets are for local work.
+- Build and test in one command: `cmake --workflow --preset <os>-<compiler>-<debug|release>`, e.g. `windows-msvc-debug` or `linux-gcc-debug`. CI runs on Linux only, since the server target is Linux. It compiles with Clang 19 (Release) and GCC, and runs the tests once on the GCC build, which also produces coverage for SonarQube. Windows presets are for local work.
 - Add a new platform or compiler as a hidden preset in `CMakePresets.json` that inherits `windows` or `linux`, then add debug/release presets on top.
-- Add tests with `limsim_add_test(<name> SOURCES ... LIBS ...)` (doctest).
+- Add tests with `hatogin_add_test(<name> SOURCES ... LIBS ...)` (doctest).
 - Keep changes small and focused; one concern per PR.
 - Record notable design choices as a short ADR in `docs/decisions/`.
 - Update `docs/` when you change architecture or a library boundary.
@@ -46,6 +46,7 @@ api   ->  core, sim, save
 | `sonarqube` | Read the quality gate and issues of a branch or pull request, and fix what it reports. | Docker, `SONARQUBE_TOKEN` |
 | `context7` | Read current documentation of C++, CMake and libraries before relying on an API. | Node; `CONTEXT7_API_KEY` optional |
 | `filesystem` | Read, write and search files of the worktree. | Node |
+| `jetbrains` | Use CLion: inspections, run configurations, symbols and refactors. | CLion running with its MCP server enabled (port 64342) |
 
 When a server is not connected, say so, then continue with the shell.
 
@@ -54,7 +55,7 @@ When a server is not connected, say so, then continue with the shell.
 - Formatting follows `.clang-format`; CLion applies it on Reformat Code. CI fails on any unformatted file.
 - `.clang-tidy` enables bugprone, cert, core guidelines, modernize, performance and readability checks as errors. Names are `lower_case` (members of classes end in `_`), template parameters `CamelCase`, macros `UPPER_CASE`.
 - Each `tests/` folder has a `.clang-tidy` that relaxes the checks doctest's macros trip.
-- Run locally: `clang-format -i <files>` and `run-clang-tidy -p build/<preset>`.
+- Run locally: `clang-format -i <files>` and `run-clang-tidy -p build/<preset>`. Use clang-tidy 19 or newer: older versions cannot parse `std::expected` from libstdc++.
 
 ## Quality gate
 

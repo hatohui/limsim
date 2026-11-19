@@ -10,7 +10,7 @@ IndentPPDirectives: AfterHash
 PPIndentWidth: 2
 IncludeBlocks: Regroup
 IncludeCategories:
-  - Regex: '^<limsim/'
+  - Regex: '^<hatogin/'
     Priority: 1
   - Regex: '^<doctest/'
     Priority: 2
