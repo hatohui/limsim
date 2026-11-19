@@ -1,4 +1,3 @@
-add_library(core INTERFACE)
+add_library(core INTERFACE
+        include/hatogin/core/tick.hpp)
 target_include_directories(core INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
-
-# TODO: switch to STATIC and list sources in src/ once code exists

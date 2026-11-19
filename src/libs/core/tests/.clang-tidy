@@ -1,6 +1,6 @@
-# doctest's TEST_CASE macro defines static functions.
 InheritParentConfig: true
 Checks: >
+  -readability-function-cognitive-complexity,
   -misc-use-anonymous-namespace,
   -cert-err58-cpp,
   -cppcoreguidelines-avoid-non-const-global-variables

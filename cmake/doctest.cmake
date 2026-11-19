@@ -1,4 +1,4 @@
-# Fetches doctest and provides limsim_add_test(<name> SOURCES ... LIBS ...).
+# Fetches doctest and provides hatogin_add_test(<name> SOURCES ... LIBS ...).
 include(FetchContent)
 FetchContent_Declare(
   doctest
@@ -13,7 +13,7 @@ set(CMAKE_POLICY_VERSION_MINIMUM 3.10)
 FetchContent_MakeAvailable(doctest)
 unset(CMAKE_POLICY_VERSION_MINIMUM)
 
-function(limsim_add_test name)
+function(hatogin_add_test name)
   cmake_parse_arguments(ARG "" "" "SOURCES;LIBS" ${ARGN})
   add_executable(${name} ${ARG_SOURCES})
   target_link_libraries(${name} PRIVATE doctest::doctest_with_main ${ARG_LIBS})
