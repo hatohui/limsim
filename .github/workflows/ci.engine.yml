@@ -54,16 +54,16 @@ jobs:
       - name: Install Ninja and the LLVM tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build clang-format clang-tidy
+          sudo apt-get install -y ninja-build clang-format clang-19 clang-tidy-19
 
       - name: Check formatting
         run: git ls-files 'src/*.h' 'src/*.hpp' 'src/*.cpp' | xargs --no-run-if-empty clang-format --dry-run --Werror
 
       - name: Configure
-        run: cmake --preset linux-clang-release
+        run: cmake --preset linux-clang-release -DCMAKE_C_COMPILER=clang-19 -DCMAKE_CXX_COMPILER=clang++-19
 
       - name: Run clang-tidy
-        run: git ls-files 'src/*.cpp' | xargs --no-run-if-empty run-clang-tidy -quiet -p build/linux-clang-release
+        run: git ls-files 'src/*.cpp' | xargs --no-run-if-empty run-clang-tidy-19 -quiet -clang-tidy-binary clang-tidy-19 -p build/linux-clang-release
 
   compile:
     name: compile (${{ matrix.label }})
@@ -75,17 +75,23 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { label: Linux Clang, os: ubuntu-24.04, preset: linux-clang-release }
-          - { label: Linux GCC, os: ubuntu-24.04, preset: linux-gcc-coverage }
+          - label: Linux Clang
+            os: ubuntu-24.04
+            preset: linux-clang-release
+            packages: clang-19
+            cmake_args: -DCMAKE_C_COMPILER=clang-19 -DCMAKE_CXX_COMPILER=clang++-19
+          - label: Linux GCC
+            os: ubuntu-24.04
+            preset: linux-gcc-coverage
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Install Ninja
-        run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - name: Install Ninja and the compiler
+        run: sudo apt-get update && sudo apt-get install -y ninja-build ${{ matrix.packages }}
 
       - name: Configure
-        run: cmake --preset ${{ matrix.preset }}
+        run: cmake --preset ${{ matrix.preset }} ${{ matrix.cmake_args }}
 
       - name: Build
         run: cmake --build --preset ${{ matrix.preset }}
