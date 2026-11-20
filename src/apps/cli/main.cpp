@@ -4,13 +4,15 @@
 
 using duration = std::chrono::milliseconds;
 
-struct EngineState {
+struct EngineState
+{
     int tick;
     bool running;
     double delta_time;
 };
 
-static void simulate(EngineState& state) {
+static void simulate(EngineState& state)
+{
     auto start = std::chrono::steady_clock::now();
     state.tick++;
     auto end = std::chrono::steady_clock::now();
@@ -20,15 +22,19 @@ static void simulate(EngineState& state) {
         '\n';
 }
 
-static void update(EngineState& state) {
+static void update(EngineState& state)
+{
     simulate(state);
 }
 
-static void start() {
+static void start()
+{
     EngineState state = {.tick = 0, .running = true, .delta_time = 0};
 
-    while (state.running) {
-        if (state.tick == 10) {
+    while (state.running)
+    {
+        if (state.tick == 10)
+        {
             state.running = false;
             continue;
         }
@@ -40,7 +46,8 @@ static void start() {
 }
 
 
-int main() {
+int main()
+{
     start();
     return 0;
 }
